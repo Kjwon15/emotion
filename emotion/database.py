@@ -1,10 +1,10 @@
 import math
-from sqlalchemy import Column, Float, Integer, String
+from sqlalchemy import Column, Float, ForeignKey, String, Table
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import relationship, sessionmaker
 
 
-__all__ = 'GRAM_LENGTH', 'Gram', 'Session'
+__all__ = 'GRAM_LENGTH', 'Base', 'Document', 'Gram', 'Session'
 
 
 Base = declarative_base()
@@ -12,25 +12,32 @@ Session = sessionmaker()
 GRAM_LENGTH = 2
 
 
-def _sigmoid(x):
-    return math.tanh(x)
+association_table = Table(
+    'association', Base.metadata,
+    Column('document_id', String, ForeignKey('documents.text')),
+    Column('gram_id', String, ForeignKey('grams.gram')))
 
 
-def _dsigmoid(y):
-    return math.atanh(y)
+class Document(Base):
+    __tablename__ = 'documents'
+    text = Column(String, primary_key=True, nullable=False)
+    grams = relationship(
+        'Gram', secondary=association_table, backref='documents')
+
+    def __init__(self, text):
+        self.text = text
 
 
 class Gram(Base):
-    NEIGHBOR_STRENGTH = 0.3
     __tablename__ = 'grams'
 
-    id = Column(Integer, primary_key=True)
-    gram = Column(String(GRAM_LENGTH), unique=True, nullable=False)
+    gram = Column(String(GRAM_LENGTH), primary_key=True, nullable=False)
 
     anger = Column(Float, nullable=False, default=.0)
     interest = Column(Float, nullable=False, default=.0)
     joy = Column(Float, nullable=False, default=.0)
     trust = Column(Float, nullable=False, default=.0)
+    idf = Column(Float, nullable=False)
 
     def __init__(self, gram):
         self.gram = gram
@@ -40,16 +47,13 @@ class Gram(Base):
         self.joy = 0
         self.trust = 0
 
-    def apply_emotion(self, anger, interest, joy, trust):
-        delta_anger = anger + self.NEIGHBOR_STRENGTH * (interest - trust)
-        delta_interest = interest + self.NEIGHBOR_STRENGTH * (anger + joy)
-        delta_joy = interest + self.NEIGHBOR_STRENGTH * (interest + trust)
-        delta_trust = trust + self.NEIGHBOR_STRENGTH * (joy - anger)
+    def update_idf(self):
+        session = Session()
+        all_count = session.query(Document).count()
+        document_count = len(self.documents)
 
-        self.anger = _sigmoid(_dsigmoid(self.anger) + delta_anger)
-        self.interest = _sigmoid(_dsigmoid(self.interest) + delta_interest)
-        self.joy = _sigmoid(_dsigmoid(self.joy) + delta_joy)
-        self.trust = _sigmoid(_dsigmoid(self.trust) + delta_trust)
+        self.idf = math.log((all_count / (1.0 + document_count)) + 1)
+        session.commit()
 
     def __repr__(self):
         return '<{0} {1}>'.format(self.__class__.__name__, self.gram)
