@@ -27,18 +27,18 @@ class Gram(Base):
     id = Column(Integer, primary_key=True)
     gram = Column(String(GRAM_LENGTH), unique=True, nullable=False)
 
-    anger = Column(Float, nullable=False)
-    interest = Column(Float, nullable=False)
-    joy = Column(Float, nullable=False)
-    trust = Column(Float, nullable=False)
+    anger = Column(Float, nullable=False, default=.0)
+    interest = Column(Float, nullable=False, default=.0)
+    joy = Column(Float, nullable=False, default=.0)
+    trust = Column(Float, nullable=False, default=.0)
 
-    def __init__(self, gram, anger=.0, interest=.0, joy=.0, trust=.0):
+    def __init__(self, gram):
         self.gram = gram
         self.count = 0
-        self.anger = anger
-        self.interest = interest
-        self.joy = joy
-        self.trust = trust
+        self.anger = 0
+        self.interest = 0
+        self.joy = 0
+        self.trust = 0
 
     def apply_emotion(self, anger, interest, joy, trust):
         delta_anger = anger + self.NEIGHBOR_STRENGTH * (interest - trust)
